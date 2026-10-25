@@ -1,0 +1,20 @@
+# Files the generator must not write (ADR 0039): our own package metadata, README, helpers and tests, and
+# build/CI files for tools we do not use.
+README.md
+git_push.sh
+.travis.yml
+.gitlab-ci.yml
+.github/**
+appveyor.yml
+.gitignore
+pom.xml
+build.gradle
+build.sbt
+settings.gradle
+gradle.properties
+gradle/**
+gradlew
+gradlew.bat
+src/main/AndroidManifest.xml
+src/main/java/com/fakturnaut/sdk/helpers/**
+src/test/**

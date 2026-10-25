@@ -1,0 +1,4206 @@
+openapi: 3.1.0
+info:
+  description: "Issue, validate, deliver and check EN 16931 e-invoices (XRechnung,\
+    \ ZUGFeRD, RO e-Factura). Authenticate with an API key as Bearer token. Test keys\
+    \ (fkn_test_...) reach only the sandbox: documents marked as test, never billed,\
+    \ deleted after 30 days."
+  title: Fakturnaut API
+  version: 1.0.0
+servers:
+- description: Fakturnaut
+  url: https://api.fakturnaut.com/v1
+security:
+- bearer: []
+- apiKey: []
+paths:
+  /api-keys:
+    get:
+      description: "Lists the tenant's keys, including revoked ones, without their\
+        \ values."
+      operationId: listApiKeys
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/ApiKeyResponse"
+                type: array
+                default: null
+          description: "the keys, newest first"
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: "Lists the tenant's keys, including revoked ones, without their values."
+      tags:
+      - API keys
+      x-accepts:
+      - application/json
+      - application/problem+json
+    post:
+      description: Issues a key. The full key is in this response only; it is stored
+        as a hash.
+      operationId: createApiKey
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ApiKeyRequest"
+        description: "key name, scopes and mode"
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyResponse"
+          description: 201 with the key including its full value
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Issues a key.
+      tags:
+      - API keys
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /api-keys/{id}:
+    delete:
+      description: Revokes a key immediately; revoking twice is harmless.
+      operationId: revokeApiKey
+      parameters:
+      - description: key identifier
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ApiKeyResponse"
+          description: the revoked key
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Revokes a key immediately; revoking twice is harmless.
+      tags:
+      - API keys
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /deliveries/{id}:
+    get:
+      description: Returns one delivery.
+      operationId: getDelivery
+      parameters:
+      - description: delivery
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliveryResponse"
+          description: the delivery
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Returns one delivery.
+      tags:
+      - Deliveries
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /hello:
+    get:
+      description: Returns a greeting in the caller's preferred language.
+      operationId: hello
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HelloResponse"
+          description: the greeting payload
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      security: []
+      summary: Returns a greeting in the caller's preferred language.
+      tags:
+      - Status
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /inbound/parse:
+    post:
+      description: |-
+        Detects the format, reads and validates a received document, and returns a plain-language report with an
+         HTML view.
+      operationId: parseDocument
+      parameters:
+      - description: "<code>Accept-Language</code>; English if it starts with <code>en</code>,\
+          \ else German"
+        explode: false
+        in: header
+        name: Accept-Language
+        required: false
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/octet-stream:
+            schema:
+              format: binary
+              type: string
+          application/pdf:
+            schema:
+              format: binary
+              type: string
+          application/xml:
+            schema:
+              format: binary
+              type: string
+          text/xml:
+            schema:
+              format: binary
+              type: string
+        description: The file as the raw request body
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InspectionResponse"
+          description: the report
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: |-
+        Detects the format, reads and validates a received document, and returns a plain-language report with an
+         HTML view.
+      tags:
+      - Inbound
+      x-content-type: application/octet-stream
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /inbound/render:
+    post:
+      description: Renders a received document as a readable PDF.
+      operationId: renderDocument
+      parameters:
+      - description: "<code>Accept-Language</code>; English if it starts with <code>en</code>,\
+          \ else German"
+        explode: false
+        in: header
+        name: Accept-Language
+        required: false
+        schema:
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/octet-stream:
+            schema:
+              format: binary
+              type: string
+          application/pdf:
+            schema:
+              format: binary
+              type: string
+          application/xml:
+            schema:
+              format: binary
+              type: string
+          text/xml:
+            schema:
+              format: binary
+              type: string
+        description: The file as the raw request body
+        required: true
+      responses:
+        "200":
+          content:
+            application/pdf:
+              schema:
+                format: binary
+                type: string
+          description: the PDF
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Renders a received document as a readable PDF.
+      tags:
+      - Inbound
+      x-content-type: application/octet-stream
+      x-accepts:
+      - application/pdf
+      - application/problem+json
+  /invoices:
+    get:
+      description: "Lists the tenant's invoices, newest first."
+      operationId: listInvoices
+      parameters:
+      - description: zero-based page number
+        explode: true
+        in: query
+        name: page
+        required: false
+        schema:
+          default: 0
+          format: int32
+          type: integer
+        style: form
+      - description: "page size, 1 to 100"
+        explode: true
+        in: query
+        name: size
+        required: false
+        schema:
+          default: 20
+          format: int32
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDtoInvoiceResponse"
+          description: one page of invoices (without documents)
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: "Lists the tenant's invoices, newest first."
+      tags:
+      - Invoices
+      x-accepts:
+      - application/json
+      - application/problem+json
+    post:
+      description: |-
+        Issues an invoice: validates it, generates the requested formats, checks them officially and archives them.
+         A repeated request with the same <code>Idempotency-Key</code> and body returns the original invoice.
+      operationId: issueInvoice
+      parameters:
+      - description: optional idempotency key
+        explode: false
+        in: header
+        name: Idempotency-Key
+        required: false
+        schema:
+          description: "1 to 200 visible ASCII characters, e.g. a UUID"
+          maxLength: 200
+          minLength: 1
+          pattern: "^[\\x21-\\x7E]{1,200}$"
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceRequest"
+        description: invoice data
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceResponse"
+          description: "A repeat with the same Idempotency-Key and body: the original\
+            \ result, with header Idempotent-Replayed: true"
+          headers:
+            Idempotent-Replayed:
+              description: true for a replayed result
+              explode: false
+              schema:
+                type: string
+              style: simple
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceResponse"
+          description: "201 with the archived invoice, or 200 with header <code>Idempotent-Replayed:\
+            \ true</code> for a repeat"
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: "Issues an invoice: validates it, generates the requested formats,\
+        \ checks them officially and archives them."
+      tags:
+      - Invoices
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /invoices/validate:
+    post:
+      description: Validates an invoice without issuing it and returns the calculated
+        totals.
+      operationId: validateInvoice
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/InvoiceRequest"
+        description: invoice data
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ValidationResponse"
+          description: "the verdict, totals and all findings"
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Validates an invoice without issuing it and returns the calculated
+        totals.
+      tags:
+      - Invoices
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /invoices/{id}:
+    get:
+      description: Returns an invoice with links to its documents.
+      operationId: getInvoice
+      parameters:
+      - description: invoice identifier
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InvoiceResponse"
+          description: the invoice
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Returns an invoice with links to its documents.
+      tags:
+      - Invoices
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /invoices/{id}/document:
+    get:
+      description: Downloads an archived document exactly as issued.
+      operationId: downloadInvoiceDocument
+      parameters:
+      - description: invoice identifier
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      - description: "<code>xrechnung-ubl</code>, <code>xrechnung-cii</code>, <code>zugferd</code>,\
+          \ <code>ro-efactura-ubl</code> or <code>ro-efactura-cii</code>"
+        explode: true
+        in: query
+        name: format
+        required: true
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/pdf:
+              schema:
+                format: binary
+                type: string
+            application/xml:
+              schema:
+                format: binary
+                type: string
+          description: the document bytes with their media type; the ETag is the SHA-256
+            of the content
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Downloads an archived document exactly as issued.
+      tags:
+      - Invoices
+      x-accepts:
+      - application/pdf
+      - application/problem+json
+      - application/xml
+  /invoices/{invoiceId}/deliveries:
+    get:
+      description: Lists the deliveries of an invoice.
+      operationId: listInvoiceDeliveries
+      parameters:
+      - description: invoice
+        explode: false
+        in: path
+        name: invoiceId
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/DeliveryResponse"
+                type: array
+                default: null
+          description: "deliveries, oldest first"
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Lists the deliveries of an invoice.
+      tags:
+      - Deliveries
+      x-accepts:
+      - application/json
+      - application/problem+json
+    post:
+      description: |-
+        Delivers an invoice. The response shows the status after the first attempt; later changes arrive as webhook
+         events <code>delivery.updated</code> and via <code>GET /v1/deliveries/{id</code>}.
+      operationId: deliverInvoice
+      parameters:
+      - description: invoice
+        explode: false
+        in: path
+        name: invoiceId
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      - description: |-
+          optional idempotency key; a repeat returns the first delivery (200,
+               <code>Idempotent-Replayed: true</code>)
+        explode: false
+        in: header
+        name: Idempotency-Key
+        required: false
+        schema:
+          description: "1 to 200 visible ASCII characters, e.g. a UUID"
+          maxLength: 200
+          minLength: 1
+          pattern: "^[\\x21-\\x7E]{1,200}$"
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/DeliveryRequest"
+        description: "channel, recipient and resend flag"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliveryResponse"
+          description: "A repeat with the same Idempotency-Key and body: the original\
+            \ result, with header Idempotent-Replayed: true"
+          headers:
+            Idempotent-Replayed:
+              description: true for a replayed result
+              explode: false
+              schema:
+                type: string
+              style: simple
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeliveryResponse"
+          description: 201 with the delivery
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Delivers an invoice.
+      tags:
+      - Deliveries
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /received-documents:
+    get:
+      description: |-
+        Lists received documents, newest first, optionally only one seller's, those received in a date range (calendar
+         days in Germany, both inclusive) or those with a validation result.
+      operationId: listReceivedDocuments
+      parameters:
+      - description: zero-based page number
+        explode: true
+        in: query
+        name: page
+        required: false
+        schema:
+          default: 0
+          format: int32
+          type: integer
+        style: form
+      - description: "page size, 1 to 100"
+        explode: true
+        in: query
+        name: size
+        required: false
+        schema:
+          default: 20
+          format: int32
+          type: integer
+        style: form
+      - description: only documents for this seller entity
+        explode: true
+        in: query
+        name: sellerId
+        required: false
+        schema:
+          format: uuid
+          type: string
+        style: form
+      - description: received on or after this day
+        explode: true
+        in: query
+        name: from
+        required: false
+        schema:
+          format: date
+          type: string
+        style: form
+      - description: received on or before this day
+        explode: true
+        in: query
+        name: to
+        required: false
+        schema:
+          format: date
+          type: string
+        style: form
+      - description: only <code>valid</code> or <code>invalid</code> invoices and
+          credit notes
+        explode: true
+        in: query
+        name: validation
+        required: false
+        schema:
+          enum:
+          - valid
+          - invalid
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDtoReceivedDocumentResponse"
+          description: one page
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: |-
+        Lists received documents, newest first, optionally only one seller's, those received in a date range (calendar
+         days in Germany, both inclusive) or those with a validation result.
+      tags:
+      - Received documents
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /received-documents/{id}:
+    get:
+      description: Returns the metadata of a received document.
+      operationId: getReceivedDocument
+      parameters:
+      - description: document
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceivedDocumentResponse"
+          description: the metadata
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Returns the metadata of a received document.
+      tags:
+      - Received documents
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /received-documents/{id}/content:
+    get:
+      description: Downloads a received document as received (UBL XML).
+      operationId: downloadReceivedDocument
+      parameters:
+      - description: document
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/xml:
+              schema:
+                format: binary
+                type: string
+          description: the XML
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Downloads a received document as received (UBL XML).
+      tags:
+      - Received documents
+      x-accepts:
+      - application/problem+json
+      - application/xml
+  /received-documents/{id}/pdf:
+    get:
+      description: Renders a received invoice or credit note as a readable PDF.
+      operationId: renderReceivedDocument
+      parameters:
+      - description: document
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      - description: "<code>Accept-Language</code>; English if it starts with <code>en</code>,\
+          \ else German"
+        explode: false
+        in: header
+        name: Accept-Language
+        required: false
+        schema:
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/pdf:
+              schema:
+                format: byte
+                type: string
+          description: the PDF
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Renders a received invoice or credit note as a readable PDF.
+      tags:
+      - Received documents
+      x-accepts:
+      - application/pdf
+      - application/problem+json
+  /received-documents/{id}/report:
+    get:
+      description: Returns the validation report stored with a received invoice or
+        credit note.
+      operationId: getReceivedDocumentReport
+      parameters:
+      - description: document
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ReceivedReportResponse"
+          description: the report as it was when the document arrived
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Returns the validation report stored with a received invoice or credit
+        note.
+      tags:
+      - Received documents
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /sellers:
+    get:
+      description: Lists the tenant's seller entities by name.
+      operationId: listSellers
+      parameters:
+      - description: zero-based page number
+        explode: true
+        in: query
+        name: page
+        required: false
+        schema:
+          default: 0
+          format: int32
+          type: integer
+        style: form
+      - description: "page size, 1 to 100"
+        explode: true
+        in: query
+        name: size
+        required: false
+        schema:
+          default: 20
+          format: int32
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PageDtoSellerResponse"
+          description: one page
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Lists the tenant's seller entities by name.
+      tags:
+      - Sellers
+      x-accepts:
+      - application/json
+      - application/problem+json
+    post:
+      description: "Creates a seller entity whose data is used on all its invoices,\
+        \ and starts its verification."
+      operationId: createSeller
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SellerRequest"
+        description: seller data and the optional authorisation confirmation
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SellerResponse"
+          description: 201 with the seller
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: "Creates a seller entity whose data is used on all its invoices, and\
+        \ starts its verification."
+      tags:
+      - Sellers
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /sellers/{id}:
+    get:
+      description: Returns a seller entity.
+      operationId: getSeller
+      parameters:
+      - description: seller identifier
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SellerResponse"
+          description: the seller
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Returns a seller entity.
+      tags:
+      - Sellers
+      x-accepts:
+      - application/json
+      - application/problem+json
+    put:
+      description: |-
+        Replaces a seller entity's data. Changing its name, VAT ID or Peppol address restarts the verification; with
+         Peppol activated, a new VAT ID or register number goes to the access point, which asks for a new identity check.
+      operationId: updateSeller
+      parameters:
+      - description: seller identifier
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SellerRequest"
+        description: new seller data
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SellerResponse"
+          description: the seller
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Replaces a seller entity's data.
+      tags:
+      - Sellers
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /sellers/{id}/attestation:
+    post:
+      description: Confirms that the seller authorised the tenant to issue and receive
+        invoices on its behalf.
+      operationId: attestSeller
+      parameters:
+      - description: seller identifier
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AttestationRequest"
+        description: "<code>{&quot;confirmed&quot;: true</code>}"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationSummary"
+          description: the verification state after re-running the checks
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Confirms that the seller authorised the tenant to issue and receive
+        invoices on its behalf.
+      tags:
+      - Sellers
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /sellers/{id}/documents:
+    post:
+      description: "Uploads a supporting document (PDF, PNG or JPEG, at most 10 MB)\
+        \ as the raw request body."
+      operationId: uploadSellerDocument
+      parameters:
+      - description: seller identifier
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      - description: "<code>commercial-register</code>, <code>trade-registration</code>\
+          \ or <code>signed-authorization</code>"
+        explode: true
+        in: query
+        name: type
+        required: true
+        schema:
+          type: string
+        style: form
+      - description: original file name
+        explode: true
+        in: query
+        name: fileName
+        required: false
+        schema:
+          default: document
+          type: string
+        style: form
+      requestBody:
+        content:
+          application/pdf:
+            schema:
+              format: binary
+              type: string
+          image/jpeg:
+            schema:
+              format: binary
+              type: string
+          image/png:
+            schema:
+              format: binary
+              type: string
+        description: The file as the raw request body
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DocumentEntry"
+          description: 201 with the stored document's metadata
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: "Uploads a supporting document (PDF, PNG or JPEG, at most 10 MB) as\
+        \ the raw request body."
+      tags:
+      - Sellers
+      x-content-type: application/pdf
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /sellers/{id}/peppol:
+    get:
+      description: Returns a seller's Peppol registration.
+      operationId: getSellerPeppol
+      parameters:
+      - description: seller
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PeppolStatusResponse"
+          description: the registration
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Returns a seller's Peppol registration.
+      tags:
+      - Sellers
+      x-accepts:
+      - application/json
+      - application/problem+json
+    post:
+      description: |-
+        Activates real Peppol for a seller: registers it at our Peppol access point for sending and, if asked for and
+         nobody else serves its address, for receiving. Repeating the call returns the existing registration (200).
+      operationId: activateSellerPeppol
+      parameters:
+      - description: seller
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PeppolActivationRequest"
+        description: whether the seller also wants to receive through us
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PeppolStatusResponse"
+          description: 201 with the registration and the identity-check link
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: |-
+        Activates real Peppol for a seller: registers it at our Peppol access point for sending and, if asked for and
+         nobody else serves its address, for receiving.
+      tags:
+      - Sellers
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /sellers/{id}/peppol/receiving:
+    post:
+      description: "Switches receiving through us on, if nobody else serves the seller's\
+        \ Peppol address."
+      operationId: enableSellerPeppolReceiving
+      parameters:
+      - description: seller
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PeppolStatusResponse"
+          description: the registration; <code>receivingBlocked</code> names the provider
+            if another one serves the address
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: "Switches receiving through us on, if nobody else serves the seller's\
+        \ Peppol address."
+      tags:
+      - Sellers
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /sellers/{id}/peppol/verification:
+    post:
+      description: Asks the access point for a new identity-check link (the old one
+        may be lost or expired).
+      operationId: renewSellerPeppolVerification
+      parameters:
+      - description: seller
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PeppolStatusResponse"
+          description: the registration with the new link
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Asks the access point for a new identity-check link (the old one may
+        be lost or expired).
+      tags:
+      - Sellers
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /sellers/{id}/verification:
+    get:
+      description: "Returns the verification details: state, history, VAT ID checks\
+        \ and uploaded documents."
+      operationId: getSellerVerification
+      parameters:
+      - description: seller identifier
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/VerificationResponse"
+          description: the details
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: "Returns the verification details: state, history, VAT ID checks and\
+        \ uploaded documents."
+      tags:
+      - Sellers
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /usage:
+    get:
+      description: Returns the usage of a month.
+      operationId: getUsage
+      parameters:
+      - description: month as <code>YYYY-MM</code> (UTC); default the current month
+        explode: true
+        in: query
+        name: period
+        required: false
+        schema:
+          type: string
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/UsageResponse"
+          description: the counters
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Returns the usage of a month.
+      tags:
+      - Usage
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /webhooks:
+    get:
+      description: Lists the endpoints without secrets.
+      operationId: listWebhooks
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/WebhookResponse"
+                type: array
+                default: null
+          description: "endpoints, newest first"
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Lists the endpoints without secrets.
+      tags:
+      - Webhooks
+      x-accepts:
+      - application/json
+      - application/problem+json
+    post:
+      description: Registers an endpoint. The signing secret is in this response only.
+      operationId: createWebhook
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookRequest"
+        description: target URL
+        required: true
+      responses:
+        "201":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResponse"
+          description: 201 with the endpoint and its secret
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Registers an endpoint.
+      tags:
+      - Webhooks
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /webhooks/{id}:
+    delete:
+      description: Removes an endpoint; no further events are sent to it.
+      operationId: deleteWebhook
+      parameters:
+      - description: endpoint
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResponse"
+          description: the removed endpoint
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Removes an endpoint; no further events are sent to it.
+      tags:
+      - Webhooks
+      x-accepts:
+      - application/json
+      - application/problem+json
+    patch:
+      description: Changes an endpoint's URL or choice of events; the secret stays.
+      operationId: updateWebhook
+      parameters:
+      - description: endpoint
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/WebhookUpdateRequest"
+        description: new URL and/or events
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResponse"
+          description: the changed endpoint
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Changes an endpoint's URL or choice of events; the secret stays.
+      tags:
+      - Webhooks
+      x-content-type: application/json
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /webhooks/{id}/deliveries:
+    get:
+      description: "Shows the deliveries to an endpoint of the last 30 days, newest\
+        \ first."
+      operationId: listWebhookDeliveries
+      parameters:
+      - description: endpoint
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      - description: "maximum number, 1 to 100"
+        explode: true
+        in: query
+        name: limit
+        required: false
+        schema:
+          default: 50
+          format: int32
+          type: integer
+        style: form
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: "#/components/schemas/WebhookDeliveryResponse"
+                type: array
+                default: null
+          description: "deliveries, newest first"
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: "Shows the deliveries to an endpoint of the last 30 days, newest first."
+      tags:
+      - Webhooks
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /webhooks/{id}/deliveries/{deliveryId}/resend:
+    post:
+      description: "Sends a finished delivery of the last 30 days again, as a new\
+        \ delivery of the same event."
+      operationId: resendWebhookDelivery
+      parameters:
+      - description: endpoint
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      - description: delivery to send again
+        explode: false
+        in: path
+        name: deliveryId
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDeliveryResponse"
+          description: Queued; it is sent within seconds
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: "Sends a finished delivery of the last 30 days again, as a new delivery\
+        \ of the same event."
+      tags:
+      - Webhooks
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /webhooks/{id}/rotate-secret:
+    post:
+      description: Gives an endpoint a new signing secret at once; the new secret
+        is in this response only.
+      operationId: rotateWebhookSecret
+      parameters:
+      - description: endpoint
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookResponse"
+          description: the endpoint with its new secret
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: Gives an endpoint a new signing secret at once; the new secret is in
+        this response only.
+      tags:
+      - Webhooks
+      x-accepts:
+      - application/json
+      - application/problem+json
+  /webhooks/{id}/test:
+    post:
+      description: "Sends a <code>webhook.test</code> event to the endpoint within\
+        \ seconds, whatever events it has chosen."
+      operationId: testWebhook
+      parameters:
+      - description: endpoint
+        explode: false
+        in: path
+        name: id
+        required: true
+        schema:
+          format: uuid
+          type: string
+        style: simple
+      responses:
+        "202":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WebhookDeliveryResponse"
+          description: Queued; it is sent within seconds
+        default:
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+          description: "An error as RFC 9457 problem with a stable code, e.g. invoice.invalid"
+      summary: "Sends a <code>webhook.test</code> event to the endpoint within seconds,\
+        \ whatever events it has chosen."
+      tags:
+      - Webhooks
+      x-accepts:
+      - application/json
+      - application/problem+json
+components:
+  schemas:
+    AddressDto:
+      description: A postal address.
+      properties:
+        additionalStreet:
+          description: additional line
+          maxLength: 200
+          minLength: 0
+          type: string
+        city:
+          description: city
+          maxLength: 100
+          minLength: 0
+          type: string
+        country:
+          description: ISO 3166-1 alpha-2 country code
+          minLength: 1
+          pattern: "[A-Za-z]{2}"
+          type: string
+        postCode:
+          description: post code
+          maxLength: 20
+          minLength: 0
+          type: string
+        street:
+          description: street and number
+          maxLength: 200
+          minLength: 0
+          type: string
+        subdivision:
+          description: country subdivision
+          maxLength: 100
+          minLength: 0
+          type: string
+      required:
+      - country
+    AllowanceChargeDto:
+      description: "An allowance or charge, on document or line level."
+      example:
+        amount: 0.08008281904610115
+        baseAmount: 0.6027456183070403
+        percentage: 0.14658129805029452
+        reason: reason
+        reasonCode: reasonCode
+        vatCategory: vatCategory
+        vatRate: 0.5962133916683182
+      properties:
+        amount:
+          description: fixed amount; ignored if a percentage is given
+          minimum: 0
+          type: number
+        baseAmount:
+          description: base amount for the percentage
+          minimum: 0
+          type: number
+        percentage:
+          description: percentage of the base amount
+          minimum: 0
+          type: number
+        reason:
+          description: reason text
+          maxLength: 200
+          minLength: 0
+          type: string
+        reasonCode:
+          description: UNTDID 5189 / 7161 reason code
+          maxLength: 10
+          minLength: 0
+          type: string
+        vatCategory:
+          description: "VAT category code (document level only), default S"
+          pattern: S|Z|E|AE|K|G|O|L|M
+          type: string
+        vatRate:
+          description: VAT rate in percent (document level only)
+          minimum: 0
+          type: number
+    ApiKeyRequest:
+      description: Request to create an API key.
+      example:
+        mode: mode
+        name: name
+        scopes:
+        - scopes
+        - scopes
+      properties:
+        mode:
+          description: |-
+            <code>live</code> (default) or <code>test</code>: a test key (<code>fkn_test_...</code>) reaches only the sandbox
+                 (ADR 0038) and has scope <code>invoices</code>
+          pattern: live|test
+          type: string
+        name:
+          description: "human-readable name, e.g. \"production\""
+          maxLength: 100
+          minLength: 0
+          type: string
+        scopes:
+          description: <code>invoices</code> and/or <code>admin</code>; omitted or
+            empty means <code>invoices</code>
+          items:
+            pattern: invoices|admin
+            type: string
+          maxItems: 2
+          minItems: 0
+          type: array
+          default: null
+      required:
+      - name
+    ApiKeyResponse:
+      description: An API key.
+      example:
+        createdAt: 2000-01-23T04:56:07.000+00:00
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        key: key
+        lastUsedAt: 2000-01-23T04:56:07.000+00:00
+        mode: mode
+        name: name
+        prefix: prefix
+        revokedAt: 2000-01-23T04:56:07.000+00:00
+        scopes:
+        - scopes
+        - scopes
+      properties:
+        createdAt:
+          description: creation time
+          format: date-time
+          type: string
+        id:
+          description: identifier
+          format: uuid
+          type: string
+        key:
+          description: the full key; only present in the response that created it
+          type: string
+        lastUsedAt:
+          description: last use (minute precision)
+          format: date-time
+          type: string
+        mode:
+          description: "<code>live</code> or <code>test</code> (sandbox only, ADR\
+            \ 0038)"
+          type: string
+        name:
+          description: name
+          type: string
+        prefix:
+          description: "public prefix, e.g. <code>fkn_ab12cd34ef56</code>"
+          type: string
+        revokedAt:
+          description: revocation time
+          format: date-time
+          type: string
+        scopes:
+          description: "what the key may do: <code>invoices</code> and/or <code>admin</code>"
+          items:
+            type: string
+          type: array
+          default: null
+    AttestationRequest:
+      description: |-
+        Confirmation that the seller authorised the tenant to issue and receive invoices on its behalf. The confirmed
+         text has version <code>seller-authorization-v1</code>.
+      example:
+        confirmed: true
+      properties:
+        confirmed:
+          description: must be <code>true</code>
+          type: boolean
+      required:
+      - confirmed
+    ContactDto:
+      description: Contact details.
+      properties:
+        email:
+          description: e-mail address
+          format: email
+          maxLength: 200
+          minLength: 0
+          type: string
+        name:
+          description: contact person or department
+          maxLength: 200
+          minLength: 0
+          type: string
+        phone:
+          description: telephone number
+          maxLength: 50
+          minLength: 0
+          type: string
+    DeliveryFailure:
+      description: Why a Peppol delivery did not arrive.
+      properties:
+        code:
+          description: |-
+            stable code: <code>not-on-peppol</code>, <code>format-not-supported</code>, <code>validation</code>,
+                 <code>transport</code>, <code>recipient-rejected</code>, <code>duplicate</code>, <code>sender-not-registered</code>,
+                 <code>sender-not-verified</code> or <code>other</code>
+          enum:
+          - not-on-peppol
+          - format-not-supported
+          - validation
+          - transport
+          - recipient-rejected
+          - duplicate
+          - sender-not-registered
+          - sender-not-verified
+          - other
+          type: string
+        de:
+          description: German explanation
+          type: string
+        en:
+          description: English explanation
+          type: string
+    DeliveryRequest:
+      description: Request to deliver an issued invoice.
+      example:
+        channel: channel
+        fallbackEmail: fallbackEmail
+        recipient: recipient
+        resend: true
+      properties:
+        channel:
+          description: "<code>peppol</code>, <code>email</code> or <code>anaf</code>"
+          minLength: 1
+          pattern: (?i)peppol|email|anaf
+          type: string
+        fallbackEmail:
+          description: |-
+            Peppol only: if the Peppol delivery fails (for example the buyer is not on Peppol), the
+                 invoice is sent to this address by e-mail, with the usual e-mail rules
+          maxLength: 320
+          minLength: 0
+          type: string
+        recipient:
+          description: |-
+            Peppol participant ID (e.g. <code>9930:DE123456788</code> or <code>0204:991-33333TEST-33</code>), e-mail
+                 address, or for ANAF the numeric CIF that receives ANAF's error messages. Optional for Peppol: without it the
+                 buyer's electronic address in the invoice (BT-49) is used
+          maxLength: 320
+          minLength: 0
+          type: string
+        resend:
+          description: <code>true</code> to deliver again to a recipient that already
+            has a pending or successful delivery
+          type: boolean
+      required:
+      - channel
+    DeliveryResponse:
+      description: A delivery of an invoice.
+      example:
+        channel: channel
+        createdAt: 2000-01-23T04:56:07.000+00:00
+        error: error
+        externalId: externalId
+        failure: ""
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        invoiceId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        peppol: ""
+        recipient: recipient
+        simulated: true
+        status: status
+        updatedAt: 2000-01-23T04:56:07.000+00:00
+      properties:
+        channel:
+          description: "<code>peppol</code>, <code>email</code> or <code>anaf</code>"
+          type: string
+        createdAt:
+          description: creation time
+          format: date-time
+          type: string
+        error:
+          description: last error
+          type: string
+        externalId:
+          description: "identifier at the channel (access point document ID, e-mail\
+            \ Message-ID, ANAF upload index)"
+          type: string
+        failure:
+          allOf:
+          - $ref: "#/components/schemas/DeliveryFailure"
+          description: "why a Peppol delivery did not arrive, if it did not"
+        id:
+          description: identifier
+          format: uuid
+          type: string
+        invoiceId:
+          description: delivered invoice
+          format: uuid
+          type: string
+        peppol:
+          allOf:
+          - $ref: "#/components/schemas/PeppolReferences"
+          description: "access point references of a real Peppol delivery, if any"
+        recipient:
+          description: recipient
+          type: string
+        simulated:
+          description: <code>true</code> if nothing was really sent (simulated Peppol
+            access point)
+          type: boolean
+        status:
+          description: |-
+            <code>PENDING</code>, <code>SENT</code>, <code>DELIVERED</code>, <code>REJECTED</code>, <code>UNCONFIRMED</code>,
+                 <code>FAILED</code> or <code>OUTCOME_UNKNOWN</code> (the access point may have the invoice; it is looked for, never
+                 resent blindly)
+          type: string
+        updatedAt:
+          description: last status change
+          format: date-time
+          type: string
+    DocumentDto:
+      description: An archived document of an invoice.
+      example:
+        fileName: fileName
+        format: format
+        href: href
+        mediaType: mediaType
+        sha256: sha256
+      properties:
+        fileName:
+          description: download file name
+          type: string
+        format:
+          description: "<code>xrechnung-ubl</code>, <code>xrechnung-cii</code>, <code>zugferd</code>,\
+            \ <code>ro-efactura-ubl</code> or <code>ro-efactura-cii</code>"
+          type: string
+        href:
+          description: API path to download the document
+          type: string
+        mediaType:
+          description: IANA media type
+          type: string
+        sha256:
+          description: SHA-256 of the archived bytes (hex)
+          type: string
+    DocumentEntry:
+      description: A supporting document (metadata only).
+      example:
+        fileName: fileName
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        mediaType: mediaType
+        sha256: sha256
+        size: 0
+        type: type
+        uploadedAt: 2000-01-23T04:56:07.000+00:00
+      properties:
+        fileName:
+          description: file name
+          type: string
+        id:
+          description: identifier
+          format: uuid
+          type: string
+        mediaType:
+          description: media type detected from the content
+          type: string
+        sha256:
+          description: SHA-256 of the content
+          type: string
+        size:
+          description: bytes
+          format: int64
+          type: integer
+        type:
+          description: "<code>commercial-register</code>, <code>trade-registration</code>\
+            \ or <code>signed-authorization</code>"
+          type: string
+        uploadedAt:
+          description: upload time
+          format: date-time
+          type: string
+    FindingDto:
+      description: A validation finding.
+      example:
+        location: location
+        message: ""
+        ruleId: ruleId
+        severity: severity
+        source: source
+      properties:
+        location:
+          description: business term or XPath the finding refers to
+          type: string
+        message:
+          allOf:
+          - $ref: "#/components/schemas/LocalizedText"
+          description: plain-language explanation in German and English
+        ruleId:
+          description: "official or engine rule identifier, e.g. <code>BR-CO-10</code>"
+          type: string
+        severity:
+          description: "<code>ERROR</code>, <code>WARNING</code> or <code>INFO</code>"
+          type: string
+        source:
+          description: "<code>BUSINESS_RULES</code>, <code>XML_SCHEMA</code>, <code>SCHEMATRON</code>\
+            \ or <code>DOCUMENT</code>"
+          type: string
+    HelloResponse:
+      description: Response body of the hello endpoint.
+      example:
+        message: message
+      properties:
+        message:
+          description: human-readable greeting
+          type: string
+    HistoryEntry:
+      description: One status change.
+      example:
+        actor: actor
+        at: 2000-01-23T04:56:07.000+00:00
+        reason: reason
+        status: status
+      properties:
+        actor:
+          description: "who: <code>system</code>, <code>operator</code>, <code>api-key:&lt;prefix&gt;</code>\
+            \ or <code>account:&lt;id&gt;</code>"
+          type: string
+        at:
+          description: when
+          format: date-time
+          type: string
+        reason:
+          description: why
+          type: string
+        status:
+          description: new status
+          type: string
+    InspectionResponse:
+      description: Result of checking a received document.
+      example:
+        findings:
+        - location: location
+          message: ""
+          ruleId: ruleId
+          severity: severity
+          source: source
+        - location: location
+          message: ""
+          ruleId: ruleId
+          severity: severity
+          source: source
+        format: ""
+        html: html
+        invoice: ""
+        summary: ""
+        valid: true
+      properties:
+        findings:
+          description: all findings
+          items:
+            $ref: "#/components/schemas/FindingDto"
+          type: array
+          default: null
+        format:
+          allOf:
+          - $ref: "#/components/schemas/LocalizedText"
+          description: "detected format, e.g. \"XRechnung (UBL)\"; <code>null</code>\
+            \ if unreadable"
+        html:
+          description: readable HTML view; <code>null</code> if unreadable
+          type: string
+        invoice:
+          allOf:
+          - $ref: "#/components/schemas/InvoiceSummaryDto"
+          description: key data; <code>null</code> if unreadable
+        summary:
+          allOf:
+          - $ref: "#/components/schemas/LocalizedText"
+          description: plain-language verdict
+        valid:
+          description: <code>true</code> if the document is a valid e-invoice
+          type: boolean
+    InvoiceRequest:
+      description: Request to validate or issue an invoice. Seller data comes from
+        the referenced seller entity.
+      example:
+        allowances:
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        buyer: ""
+        buyerReference: buyerReference
+        charges:
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        contractReference: contractReference
+        currency: currency
+        deliveryAddress: ""
+        deliveryDate: 2000-01-23
+        deliveryPartyName: deliveryPartyName
+        dueDate: 2000-01-23
+        formats:
+        - formats
+        - formats
+        - formats
+        - formats
+        invoicePeriod: ""
+        issueDate: 2000-01-23
+        lines:
+        - allowances:
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          baseQuantity: 0.5637376656633328
+          charges:
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          description: description
+          id: id
+          name: name
+          netPrice: 2.3021358869347655
+          period: ""
+          quantity: 7.061401241503109
+          sellerItemId: sellerItemId
+          unitCode: unitCode
+          vatCategory: vatCategory
+          vatRate: 0.9301444243932576
+        - allowances:
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          baseQuantity: 0.5637376656633328
+          charges:
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          description: description
+          id: id
+          name: name
+          netPrice: 2.3021358869347655
+          period: ""
+          quantity: 7.061401241503109
+          sellerItemId: sellerItemId
+          unitCode: unitCode
+          vatCategory: vatCategory
+          vatRate: 0.9301444243932576
+        - allowances:
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          baseQuantity: 0.5637376656633328
+          charges:
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          description: description
+          id: id
+          name: name
+          netPrice: 2.3021358869347655
+          period: ""
+          quantity: 7.061401241503109
+          sellerItemId: sellerItemId
+          unitCode: unitCode
+          vatCategory: vatCategory
+          vatRate: 0.9301444243932576
+        - allowances:
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          baseQuantity: 0.5637376656633328
+          charges:
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          description: description
+          id: id
+          name: name
+          netPrice: 2.3021358869347655
+          period: ""
+          quantity: 7.061401241503109
+          sellerItemId: sellerItemId
+          unitCode: unitCode
+          vatCategory: vatCategory
+          vatRate: 0.9301444243932576
+        - allowances:
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          baseQuantity: 0.5637376656633328
+          charges:
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          - amount: 0.08008281904610115
+            baseAmount: 0.6027456183070403
+            percentage: 0.14658129805029452
+            reason: reason
+            reasonCode: reasonCode
+            vatCategory: vatCategory
+            vatRate: 0.5962133916683182
+          description: description
+          id: id
+          name: name
+          netPrice: 2.3021358869347655
+          period: ""
+          quantity: 7.061401241503109
+          sellerItemId: sellerItemId
+          unitCode: unitCode
+          vatCategory: vatCategory
+          vatRate: 0.9301444243932576
+        notes:
+        - subjectCode: subjectCode
+          text: text
+        - subjectCode: subjectCode
+          text: text
+        - subjectCode: subjectCode
+          text: text
+        - subjectCode: subjectCode
+          text: text
+        - subjectCode: subjectCode
+          text: text
+        number: number
+        payment: ""
+        paymentTerms: paymentTerms
+        precedingInvoices:
+        - issueDate: 2000-01-23
+          number: number
+        - issueDate: 2000-01-23
+          number: number
+        - issueDate: 2000-01-23
+          number: number
+        - issueDate: 2000-01-23
+          number: number
+        - issueDate: 2000-01-23
+          number: number
+        prepaidAmount: 3.616076749251911
+        projectReference: projectReference
+        purchaseOrderReference: purchaseOrderReference
+        seller: ""
+        sellerId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        taxRepresentative: ""
+        typeCode: typeCode
+        vatAccounting: ""
+        vatExemptions:
+        - category: category
+          code: code
+          reason: reason
+        - category: category
+          code: code
+          reason: reason
+        - category: category
+          code: code
+          reason: reason
+        - category: category
+          code: code
+          reason: reason
+        - category: category
+          code: code
+          reason: reason
+      properties:
+        allowances:
+          description: document-level allowances (BG-20)
+          items:
+            $ref: "#/components/schemas/AllowanceChargeDto"
+          maxItems: 50
+          minItems: 0
+          type: array
+          default: null
+        buyer:
+          allOf:
+          - $ref: "#/components/schemas/PartyDto"
+          description: buyer (BG-7)
+        buyerReference:
+          description: buyer reference or Leitweg-ID (BT-10)
+          maxLength: 200
+          minLength: 0
+          type: string
+        charges:
+          description: document-level charges (BG-21)
+          items:
+            $ref: "#/components/schemas/AllowanceChargeDto"
+          maxItems: 50
+          minItems: 0
+          type: array
+          default: null
+        contractReference:
+          description: contract reference (BT-12)
+          maxLength: 200
+          minLength: 0
+          type: string
+        currency:
+          description: "ISO 4217 currency (BT-5), default EUR"
+          pattern: "[A-Z]{3}"
+          type: string
+        deliveryAddress:
+          allOf:
+          - $ref: "#/components/schemas/AddressDto"
+          description: "the address the goods go to (BG-15), needed for intra-community\
+            \ supplies (BR-IC-12)"
+        deliveryDate:
+          description: actual delivery date (BT-72)
+          format: date
+          type: string
+        deliveryPartyName:
+          description: the name of the party receiving the goods (BT-70)
+          maxLength: 200
+          minLength: 0
+          type: string
+        dueDate:
+          description: payment due date (BT-9)
+          format: date
+          type: string
+        formats:
+          description: |-
+            formats to generate: <code>xrechnung-ubl</code>, <code>xrechnung-cii</code>, <code>zugferd</code>,
+                 <code>ro-efactura-ubl</code>, <code>ro-efactura-cii</code>; none means the seller country's formats
+          items:
+            pattern: xrechnung-ubl|xrechnung-cii|zugferd|ro-efactura-ubl|ro-efactura-cii
+            type: string
+          maxItems: 4
+          minItems: 0
+          type: array
+          default: null
+        invoicePeriod:
+          allOf:
+          - $ref: "#/components/schemas/PeriodDto"
+          description: invoicing period (BG-14)
+        issueDate:
+          description: issue date (BT-2)
+          format: date
+          type: string
+        lines:
+          description: invoice lines (BG-25)
+          items:
+            $ref: "#/components/schemas/LineDto"
+          maxItems: 500
+          minItems: 0
+          type: array
+          default: null
+        notes:
+          description: invoice notes (BG-1)
+          items:
+            $ref: "#/components/schemas/Note"
+          maxItems: 50
+          minItems: 0
+          type: array
+          default: null
+        number:
+          description: invoice number (BT-1)
+          maxLength: 200
+          minLength: 0
+          type: string
+        payment:
+          allOf:
+          - $ref: "#/components/schemas/PaymentDto"
+          description: "payment instructions (BG-16); default: SEPA transfer to the\
+            \ seller's account"
+        paymentTerms:
+          description: payment terms text (BT-20)
+          maxLength: 2000
+          minLength: 0
+          type: string
+        precedingInvoices:
+          description: "preceding invoices, for credit notes and corrections (BG-3)"
+          items:
+            $ref: "#/components/schemas/PrecedingInvoice"
+          maxItems: 20
+          minItems: 0
+          type: array
+          default: null
+        prepaidAmount:
+          description: amount already paid (BT-113)
+          type: number
+        projectReference:
+          description: project reference (BT-11)
+          maxLength: 200
+          minLength: 0
+          type: string
+        purchaseOrderReference:
+          description: purchase order reference (BT-13)
+          maxLength: 200
+          minLength: 0
+          type: string
+        seller:
+          allOf:
+          - $ref: "#/components/schemas/PartyDto"
+          description: seller party data (public create tool only; the API takes it
+            from the seller entity)
+        sellerId:
+          description: seller entity issuing the invoice (API; required there)
+          format: uuid
+          type: string
+        taxRepresentative:
+          allOf:
+          - $ref: "#/components/schemas/TaxRepresentativeDto"
+          description: seller tax representative (BG-11)
+        typeCode:
+          description: "UNTDID 1001 type code (BT-3), default 380"
+          pattern: "\\d{3}"
+          type: string
+        vatAccounting:
+          allOf:
+          - $ref: "#/components/schemas/VatAccountingDto"
+          description: |-
+            VAT accounting currency and the VAT total in it (BT-6, BT-111), e.g. RON for a Romanian
+                 seller's EUR invoice
+        vatExemptions:
+          description: "exemption reasons per VAT category, overriding the country\
+            \ defaults (BT-120/121)"
+          items:
+            $ref: "#/components/schemas/VatExemptionDto"
+          maxItems: 9
+          minItems: 0
+          type: array
+          default: null
+      required:
+      - buyer
+      - issueDate
+      - lines
+      - number
+    InvoiceResponse:
+      description: An issued invoice.
+      example:
+        amountDue: 0.8008281904610115
+        buyerName: buyerName
+        createdAt: 2000-01-23T04:56:07.000+00:00
+        currency: currency
+        documents:
+        - fileName: fileName
+          format: format
+          href: href
+          mediaType: mediaType
+          sha256: sha256
+        - fileName: fileName
+          format: format
+          href: href
+          mediaType: mediaType
+          sha256: sha256
+        findings:
+        - location: location
+          message: ""
+          ruleId: ruleId
+          severity: severity
+          source: source
+        - location: location
+          message: ""
+          ruleId: ruleId
+          severity: severity
+          source: source
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        issueDate: 2000-01-23
+        number: number
+        sellerId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        typeCode: typeCode
+      properties:
+        amountDue:
+          description: amount due (BT-115)
+          type: number
+        buyerName:
+          description: buyer name (BT-44)
+          type: string
+        createdAt:
+          description: archiving time
+          format: date-time
+          type: string
+        currency:
+          description: currency (BT-5)
+          type: string
+        documents:
+          description: archived documents (empty in list results)
+          items:
+            $ref: "#/components/schemas/DocumentDto"
+          type: array
+          default: null
+        findings:
+          description: warnings and information found while issuing; <code>null</code>
+            when not freshly issued
+          items:
+            $ref: "#/components/schemas/FindingDto"
+          type: array
+          default: null
+        id:
+          description: identifier
+          format: uuid
+          type: string
+        issueDate:
+          description: issue date (BT-2)
+          format: date
+          type: string
+        number:
+          description: invoice number (BT-1)
+          type: string
+        sellerId:
+          description: issuing seller entity
+          format: uuid
+          type: string
+        typeCode:
+          description: type code (BT-3)
+          type: string
+    InvoiceSummaryDto:
+      description: Key data of a received invoice.
+      properties:
+        buyerName:
+          description: buyer name (BT-44)
+          type: string
+        currency:
+          description: currency (BT-5)
+          type: string
+        issueDate:
+          description: issue date (BT-2)
+          format: date
+          type: string
+        number:
+          description: invoice number (BT-1)
+          type: string
+        sellerName:
+          description: seller name (BT-27)
+          type: string
+        totals:
+          allOf:
+          - $ref: "#/components/schemas/TotalsDto"
+          description: document totals
+        typeCode:
+          description: type code (BT-3)
+          type: string
+    LineDto:
+      description: An invoice line.
+      example:
+        allowances:
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        baseQuantity: 0.5637376656633328
+        charges:
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        - amount: 0.08008281904610115
+          baseAmount: 0.6027456183070403
+          percentage: 0.14658129805029452
+          reason: reason
+          reasonCode: reasonCode
+          vatCategory: vatCategory
+          vatRate: 0.5962133916683182
+        description: description
+        id: id
+        name: name
+        netPrice: 2.3021358869347655
+        period: ""
+        quantity: 7.061401241503109
+        sellerItemId: sellerItemId
+        unitCode: unitCode
+        vatCategory: vatCategory
+        vatRate: 0.9301444243932576
+      properties:
+        allowances:
+          description: line allowances
+          items:
+            $ref: "#/components/schemas/AllowanceChargeDto"
+          maxItems: 10
+          minItems: 0
+          type: array
+          default: null
+        baseQuantity:
+          description: price base quantity (BT-149)
+          exclusiveMinimum: true
+          minimum: 0
+          type: number
+        charges:
+          description: line charges
+          items:
+            $ref: "#/components/schemas/AllowanceChargeDto"
+          maxItems: 10
+          minItems: 0
+          type: array
+          default: null
+        description:
+          description: item description (BT-154)
+          maxLength: 2000
+          minLength: 0
+          type: string
+        id:
+          description: "line identifier, default its position"
+          maxLength: 50
+          minLength: 0
+          type: string
+        name:
+          description: item name (BT-153)
+          maxLength: 500
+          minLength: 0
+          type: string
+        netPrice:
+          description: net unit price (BT-146)
+          type: number
+        period:
+          allOf:
+          - $ref: "#/components/schemas/PeriodDto"
+          description: line period
+        quantity:
+          description: invoiced quantity (BT-129)
+          type: number
+        sellerItemId:
+          description: seller's item identifier (BT-155)
+          maxLength: 100
+          minLength: 0
+          type: string
+        unitCode:
+          description: "UN/ECE Rec. 20 unit code (BT-130), default C62"
+          maxLength: 3
+          minLength: 0
+          type: string
+        vatCategory:
+          description: "VAT category code, default S"
+          pattern: S|Z|E|AE|K|G|O|L|M
+          type: string
+        vatRate:
+          description: VAT rate in percent
+          minimum: 0
+          type: number
+      required:
+      - name
+      - netPrice
+      - quantity
+    LocalizedText:
+      properties:
+        de:
+          type: string
+        en:
+          type: string
+    Note:
+      description: A note (BG-1).
+      example:
+        subjectCode: subjectCode
+        text: text
+      properties:
+        subjectCode:
+          description: UNTDID 4451 subject code (BT-21)
+          pattern: "[A-Z]{3}"
+          type: string
+        text:
+          description: note text (BT-22)
+          maxLength: 2000
+          minLength: 0
+          type: string
+      required:
+      - text
+    PageDtoInvoiceResponse:
+      description: One page of a list.
+      example:
+        items:
+        - amountDue: 0.8008281904610115
+          buyerName: buyerName
+          createdAt: 2000-01-23T04:56:07.000+00:00
+          currency: currency
+          documents:
+          - fileName: fileName
+            format: format
+            href: href
+            mediaType: mediaType
+            sha256: sha256
+          - fileName: fileName
+            format: format
+            href: href
+            mediaType: mediaType
+            sha256: sha256
+          findings:
+          - location: location
+            message: ""
+            ruleId: ruleId
+            severity: severity
+            source: source
+          - location: location
+            message: ""
+            ruleId: ruleId
+            severity: severity
+            source: source
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          issueDate: 2000-01-23
+          number: number
+          sellerId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          typeCode: typeCode
+        - amountDue: 0.8008281904610115
+          buyerName: buyerName
+          createdAt: 2000-01-23T04:56:07.000+00:00
+          currency: currency
+          documents:
+          - fileName: fileName
+            format: format
+            href: href
+            mediaType: mediaType
+            sha256: sha256
+          - fileName: fileName
+            format: format
+            href: href
+            mediaType: mediaType
+            sha256: sha256
+          findings:
+          - location: location
+            message: ""
+            ruleId: ruleId
+            severity: severity
+            source: source
+          - location: location
+            message: ""
+            ruleId: ruleId
+            severity: severity
+            source: source
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          issueDate: 2000-01-23
+          number: number
+          sellerId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          typeCode: typeCode
+        page: 6
+        size: 1
+        totalItems: 5
+        totalPages: 5
+      properties:
+        items:
+          description: elements
+          items:
+            $ref: "#/components/schemas/InvoiceResponse"
+          type: array
+          default: null
+        page:
+          description: zero-based page number
+          format: int32
+          type: integer
+        size:
+          description: page size
+          format: int32
+          type: integer
+        totalItems:
+          description: number of elements across all pages
+          format: int64
+          type: integer
+        totalPages:
+          description: number of pages
+          format: int64
+          type: integer
+    PageDtoReceivedDocumentResponse:
+      description: One page of a list.
+      example:
+        items:
+        - documentType: documentType
+          href: href
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          kind: invoice
+          messageId: messageId
+          pdfHref: pdfHref
+          receivedAt: 2000-01-23T04:56:07.000+00:00
+          reportHref: reportHref
+          sellerId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          sender: sender
+          validation: valid
+        - documentType: documentType
+          href: href
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          kind: invoice
+          messageId: messageId
+          pdfHref: pdfHref
+          receivedAt: 2000-01-23T04:56:07.000+00:00
+          reportHref: reportHref
+          sellerId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          sender: sender
+          validation: valid
+        page: 0
+        size: 6
+        totalItems: 1
+        totalPages: 5
+      properties:
+        items:
+          description: elements
+          items:
+            $ref: "#/components/schemas/ReceivedDocumentResponse"
+          type: array
+          default: null
+        page:
+          description: zero-based page number
+          format: int32
+          type: integer
+        size:
+          description: page size
+          format: int32
+          type: integer
+        totalItems:
+          description: number of elements across all pages
+          format: int64
+          type: integer
+        totalPages:
+          description: number of pages
+          format: int64
+          type: integer
+    PageDtoSellerResponse:
+      description: One page of a list.
+      example:
+        items:
+        - accountName: accountName
+          bic: bic
+          createdAt: 2000-01-23T04:56:07.000+00:00
+          iban: iban
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          party: ""
+          verification: ""
+        - accountName: accountName
+          bic: bic
+          createdAt: 2000-01-23T04:56:07.000+00:00
+          iban: iban
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          party: ""
+          verification: ""
+        page: 0
+        size: 6
+        totalItems: 1
+        totalPages: 5
+      properties:
+        items:
+          description: elements
+          items:
+            $ref: "#/components/schemas/SellerResponse"
+          type: array
+          default: null
+        page:
+          description: zero-based page number
+          format: int32
+          type: integer
+        size:
+          description: page size
+          format: int32
+          type: integer
+        totalItems:
+          description: number of elements across all pages
+          format: int64
+          type: integer
+        totalPages:
+          description: number of pages
+          format: int64
+          type: integer
+    PartyDto:
+      description: "A party (buyer, or seller entity data)."
+      properties:
+        address:
+          allOf:
+          - $ref: "#/components/schemas/AddressDto"
+          description: postal address
+        contact:
+          allOf:
+          - $ref: "#/components/schemas/ContactDto"
+          description: contact details
+        electronicAddress:
+          description: electronic address (BT-34 / BT-49)
+          maxLength: 200
+          minLength: 0
+          type: string
+        electronicAddressScheme:
+          description: "EAS code, e.g. <code>EM</code> or <code>0204</code>"
+          maxLength: 10
+          minLength: 0
+          type: string
+        identifier:
+          description: party identifier (e.g. GLN)
+          maxLength: 100
+          minLength: 0
+          type: string
+        identifierScheme:
+          description: ISO 6523 scheme of the identifier
+          maxLength: 10
+          minLength: 0
+          type: string
+        legalRegistrationId:
+          description: legal registration identifier
+          maxLength: 100
+          minLength: 0
+          type: string
+        name:
+          description: registered name
+          maxLength: 300
+          minLength: 0
+          type: string
+        taxNumber:
+          description: local tax number (sellers only)
+          maxLength: 30
+          minLength: 0
+          type: string
+        tradingName:
+          description: trading name
+          maxLength: 300
+          minLength: 0
+          type: string
+        vatId:
+          description: VAT identifier with country prefix
+          maxLength: 30
+          minLength: 0
+          type: string
+      required:
+      - address
+      - name
+    PaymentDto:
+      description: Payment instructions.
+      properties:
+        accountName:
+          description: account holder (BT-85)
+          maxLength: 200
+          minLength: 0
+          type: string
+        bic:
+          description: payee BIC (BT-86)
+          maxLength: 11
+          minLength: 0
+          type: string
+        creditorId:
+          description: SEPA creditor identifier (BT-90)
+          maxLength: 50
+          minLength: 0
+          type: string
+        debitedIban:
+          description: IBAN to be debited (BT-91)
+          maxLength: 40
+          minLength: 0
+          type: string
+        iban:
+          description: payee IBAN (BT-84)
+          maxLength: 40
+          minLength: 0
+          type: string
+        mandateReference:
+          description: SEPA mandate reference (BT-89)
+          maxLength: 100
+          minLength: 0
+          type: string
+        meansCode:
+          description: "UNTDID 4461 code, default 58 (SEPA credit transfer)"
+          pattern: "\\d{1,3}"
+          type: string
+        remittanceInformation:
+          description: reference to quote with the payment (BT-83)
+          maxLength: 140
+          minLength: 0
+          type: string
+    PeppolActivationRequest:
+      description: Request to activate real Peppol for a seller.
+      example:
+        receive: true
+      properties:
+        receive:
+          description: |-
+            <code>true</code> if the seller also wants to receive invoices through us (default <code>false</code>:
+                 sending only)
+          type: boolean
+    PeppolReceivingBlocked:
+      description: "Why receiving was not switched on: another provider serves the\
+        \ seller's Peppol address."
+      properties:
+        explanation:
+          allOf:
+          - $ref: "#/components/schemas/PeppolTexts"
+          description: what the seller can do
+        provider:
+          description: "the serving provider, as its access point describes itself"
+          type: string
+    PeppolReferences:
+      description: Access point references of a real Peppol delivery.
+      properties:
+        documentType:
+          description: Peppol document type sent
+          type: string
+        envelopeId:
+          description: SBDH instance identifier
+          type: string
+        fallbackDeliveryId:
+          description: the e-mail delivery started because the Peppol delivery failed
+          format: uuid
+          type: string
+        format:
+          description: "our format sent: <code>xrechnung-ubl</code> or <code>xrechnung-cii</code>"
+          type: string
+        messageId:
+          description: AS4 message identifier
+          type: string
+    PeppolStatusResponse:
+      description: A seller's Peppol registration.
+      example:
+        createdAt: 2000-01-23T04:56:07.000+00:00
+        explanation: ""
+        receiveRequested: true
+        receiving: true
+        receivingBlocked: ""
+        status: pending
+        statusChangedAt: 2000-01-23T04:56:07.000+00:00
+        statusMessage: statusMessage
+        statusReason: identifiers-pending
+        updatedAt: 2000-01-23T04:56:07.000+00:00
+        verificationUrl: verificationUrl
+      properties:
+        createdAt:
+          description: when Peppol was activated
+          format: date-time
+          type: string
+        explanation:
+          allOf:
+          - $ref: "#/components/schemas/PeppolTexts"
+          description: "who must open the link, and why"
+        receiveRequested:
+          description: whether the seller asked to receive through us
+          type: boolean
+        receiving:
+          description: whether the seller is registered to receive Peppol invoices
+            through us
+          type: boolean
+        receivingBlocked:
+          allOf:
+          - $ref: "#/components/schemas/PeppolReceivingBlocked"
+          description: why receiving is off although requested
+        status:
+          description: |-
+            the access point's identity check: <code>pending</code>, <code>verified</code>, <code>rejected</code> or
+                 <code>error</code>
+          enum:
+          - pending
+          - verified
+          - rejected
+          - error
+          type: string
+        statusChangedAt:
+          description: when the identity check last changed
+          format: date-time
+          type: string
+        statusMessage:
+          description: "the message behind <code>statusReason</code>, in English"
+          type: string
+        statusReason:
+          description: |-
+            why the status is <code>error</code>: <code>identifiers-pending</code> (a new VAT ID or register
+                 number has not reached the access point yet; retried), <code>identifiers-invalid</code> (the new identifiers
+                 cannot be used for Peppol), <code>identifiers-refused</code> (the access point refused them; correct the seller),
+                 or <code>access-point</code> (the access point's own message)
+          enum:
+          - identifiers-pending
+          - identifiers-invalid
+          - identifiers-refused
+          - access-point
+          type: string
+        updatedAt:
+          description: last change
+          format: date-time
+          type: string
+        verificationUrl:
+          description: |-
+            the link an authorised representative opens for the identity check; only for keys with
+                 scope <code>admin</code> and while the check is not verified
+          type: string
+    PeppolTexts:
+      description: A text in German and English.
+      properties:
+        de:
+          description: German
+          type: string
+        en:
+          description: English
+          type: string
+    PeriodDto:
+      description: A period.
+      properties:
+        end:
+          description: last day
+          format: date
+          type: string
+        start:
+          description: first day
+          format: date
+          type: string
+    PrecedingInvoice:
+      description: A preceding invoice reference (BG-3).
+      example:
+        issueDate: 2000-01-23
+        number: number
+      properties:
+        issueDate:
+          description: issue date (BT-26)
+          format: date
+          type: string
+        number:
+          description: invoice number (BT-25)
+          maxLength: 200
+          minLength: 0
+          type: string
+      required:
+      - number
+    Problem:
+      description: "Error response (RFC 9457, application/problem+json)"
+      properties:
+        accessPoint:
+          $ref: "#/components/schemas/Problem_accessPoint"
+        code:
+          description: "Stable error code, e.g. invoice.invalid or sandbox.live-only"
+          type: string
+        detail:
+          description: Explanation in English
+          type: string
+        errors:
+          description: "Invalid fields, for request.invalid"
+          items:
+            $ref: "#/components/schemas/Problem_errors_inner"
+          type: array
+          default: null
+        findings:
+          description: "Rule violations, for invoice.invalid"
+          items:
+            $ref: "#/components/schemas/FindingDto"
+          type: array
+          default: null
+        instance:
+          description: Request path
+          type: string
+        message:
+          allOf:
+          - $ref: "#/components/schemas/LocalizedText"
+          description: "Plain-language explanation in German and English, for document.unreadable"
+        status:
+          description: HTTP status code
+          format: int32
+          type: integer
+        title:
+          description: Short summary of the HTTP status
+          type: string
+        type:
+          description: Problem type URI; about:blank for most errors
+          type: string
+      required:
+      - status
+    ReceivedDocumentResponse:
+      description: A document received over Peppol.
+      example:
+        documentType: documentType
+        href: href
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        kind: invoice
+        messageId: messageId
+        pdfHref: pdfHref
+        receivedAt: 2000-01-23T04:56:07.000+00:00
+        reportHref: reportHref
+        sellerId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        sender: sender
+        validation: valid
+      properties:
+        documentType:
+          description: Peppol document type
+          type: string
+        href:
+          description: API path to download the document as received
+          type: string
+        id:
+          description: identifier
+          format: uuid
+          type: string
+        kind:
+          description: |-
+            <code>invoice</code>, <code>credit-note</code>, <code>other</code> (orders, responses, ...) or <code>document</code>
+                 (received before documents were classified)
+          enum:
+          - invoice
+          - credit-note
+          - other
+          - document
+          type: string
+        messageId:
+          description: access point message identifier
+          type: string
+        pdfHref:
+          description: "API path of a readable PDF view, for invoices and credit notes"
+          type: string
+        receivedAt:
+          description: time of receipt
+          format: date-time
+          type: string
+        reportHref:
+          description: "API path of the validation report, if one is stored"
+          type: string
+        sellerId:
+          description: receiving seller entity
+          format: uuid
+          type: string
+        sender:
+          description: sending participant
+          type: string
+        validation:
+          description: "our validation result for invoices and credit notes: <code>valid</code>\
+            \ or <code>invalid</code>"
+          enum:
+          - valid
+          - invalid
+          type: string
+    ReceivedReportResponse:
+      description: "The validation report stored with a received invoice or credit\
+        \ note, as it was when the document arrived."
+      example:
+        findings:
+        - location: location
+          message: ""
+          ruleId: ruleId
+          severity: severity
+          source: source
+        - location: location
+          message: ""
+          ruleId: ruleId
+          severity: severity
+          source: source
+        valid: true
+      properties:
+        findings:
+          description: the findings
+          items:
+            $ref: "#/components/schemas/FindingDto"
+          type: array
+          default: null
+        valid:
+          description: whether no error was found
+          type: boolean
+    SellerRequest:
+      description: Request to create a seller entity.
+      example:
+        accountName: accountName
+        authorizationConfirmed: true
+        bic: bic
+        iban: iban
+        party: ""
+      properties:
+        accountName:
+          description: holder of the default account
+          maxLength: 200
+          minLength: 0
+          type: string
+        authorizationConfirmed:
+          description: |-
+            <code>true</code> to confirm that the seller authorised the tenant to issue and
+                 receive invoices on its behalf (attestation <code>seller-authorization-v1</code>, needed for verification)
+          type: boolean
+        bic:
+          description: BIC of the default account
+          maxLength: 11
+          minLength: 0
+          type: string
+        iban:
+          description: default account for SEPA credit transfer
+          maxLength: 40
+          minLength: 0
+          type: string
+        party:
+          allOf:
+          - $ref: "#/components/schemas/PartyDto"
+          description: seller party data (BG-4)
+      required:
+      - party
+    SellerResponse:
+      description: A seller entity.
+      example:
+        accountName: accountName
+        bic: bic
+        createdAt: 2000-01-23T04:56:07.000+00:00
+        iban: iban
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        party: ""
+        verification: ""
+      properties:
+        accountName:
+          description: holder of the default account
+          type: string
+        bic:
+          description: BIC of the default account
+          type: string
+        createdAt:
+          description: creation time
+          format: date-time
+          type: string
+        iban:
+          description: default account
+          type: string
+        id:
+          description: identifier
+          format: uuid
+          type: string
+        party:
+          allOf:
+          - $ref: "#/components/schemas/PartyDto"
+          description: seller party data
+        verification:
+          allOf:
+          - $ref: "#/components/schemas/VerificationSummary"
+          description: "verification state (real Peppol needs <code>verified</code>,\
+            \ ADR 0012)"
+    TaxRepresentativeDto:
+      description: Seller tax representative (BG-11).
+      properties:
+        address:
+          allOf:
+          - $ref: "#/components/schemas/AddressDto"
+          description: postal address (BG-12)
+        name:
+          description: name (BT-62)
+          maxLength: 200
+          minLength: 0
+          type: string
+        vatId:
+          description: VAT identifier with country prefix (BT-63)
+          maxLength: 30
+          minLength: 0
+          type: string
+      required:
+      - address
+      - name
+      - vatId
+    TotalsDto:
+      description: Calculated document totals (BG-22).
+      properties:
+        allowanceTotal:
+          description: sum of document allowances (BT-107)
+          type: number
+        amountDue:
+          description: amount due for payment (BT-115)
+          type: number
+        chargeTotal:
+          description: sum of document charges (BT-108)
+          type: number
+        lineNetTotal:
+          description: sum of line net amounts (BT-106)
+          type: number
+        prepaidAmount:
+          description: paid amount (BT-113)
+          type: number
+        taxExclusiveAmount:
+          description: total without VAT (BT-109)
+          type: number
+        taxInclusiveAmount:
+          description: total with VAT (BT-112)
+          type: number
+        vatTotal:
+          description: total VAT (BT-110)
+          type: number
+    UsageResponse:
+      description: Usage of one calendar month.
+      example:
+        activeSellers: 0
+        inboundParsed: 6
+        invoicesIssued: 1
+        invoicesValidated: 5
+        period: period
+      properties:
+        activeSellers:
+          description: seller entities that issued at least one invoice
+          format: int64
+          type: integer
+        inboundParsed:
+          description: received documents checked
+          format: int64
+          type: integer
+        invoicesIssued:
+          description: issued invoices
+          format: int64
+          type: integer
+        invoicesValidated:
+          description: validations without issuing
+          format: int64
+          type: integer
+        period:
+          description: "month, <code>YYYY-MM</code> (UTC)"
+          type: string
+    ValidationResponse:
+      description: Result of validating an invoice without issuing it.
+      example:
+        findings:
+        - location: location
+          message: ""
+          ruleId: ruleId
+          severity: severity
+          source: source
+        - location: location
+          message: ""
+          ruleId: ruleId
+          severity: severity
+          source: source
+        summary: ""
+        totals: ""
+        valid: true
+      properties:
+        findings:
+          description: all findings
+          items:
+            $ref: "#/components/schemas/FindingDto"
+          type: array
+          default: null
+        summary:
+          allOf:
+          - $ref: "#/components/schemas/LocalizedText"
+          description: plain-language verdict
+        totals:
+          allOf:
+          - $ref: "#/components/schemas/TotalsDto"
+          description: calculated totals
+        valid:
+          description: <code>true</code> if the invoice has no error and could be
+            issued
+          type: boolean
+    VatAccountingDto:
+      description: "VAT accounting currency (BT-6) and the invoice total VAT amount\
+        \ in it (BT-111), converted by the issuer."
+      properties:
+        currency:
+          description: ISO 4217 code of the VAT accounting currency
+          pattern: "[A-Z]{3}"
+          type: string
+        vatTotal:
+          description: "total VAT amount in that currency, two decimals"
+          type: number
+      required:
+      - currency
+      - vatTotal
+    VatCheckEntry:
+      description: One VAT ID check.
+      example:
+        cached: true
+        checkedAt: 2000-01-23T04:56:07.000+00:00
+        errorCode: errorCode
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        nameScore: 0
+        outcome: outcome
+        registeredName: registeredName
+        requestIdentifier: requestIdentifier
+        vatId: vatId
+      properties:
+        cached:
+          description: whether an answer from the last 24 hours was reused
+          type: boolean
+        checkedAt:
+          description: when it was checked
+          format: date-time
+          type: string
+        errorCode:
+          description: the registry's error code when unavailable
+          type: string
+        id:
+          description: identifier
+          format: uuid
+          type: string
+        nameScore:
+          description: "similarity 0–100 with the seller's name, if a name came back"
+          format: int32
+          type: integer
+        outcome:
+          description: "<code>valid</code>, <code>invalid</code>, <code>malformed</code>\
+            \ or <code>unavailable</code>"
+          type: string
+        registeredName:
+          description: "name the registry returned, if any"
+          type: string
+        requestIdentifier:
+          description: "the registry's consultation reference, if any"
+          type: string
+        vatId:
+          description: checked VAT ID
+          type: string
+    VatExemptionDto:
+      description: A VAT exemption reason for one category.
+      example:
+        category: category
+        code: code
+        reason: reason
+      properties:
+        category:
+          description: VAT category code
+          minLength: 1
+          pattern: E|AE|K|G|O
+          type: string
+        code:
+          description: VATEX code
+          maxLength: 30
+          minLength: 0
+          type: string
+        reason:
+          description: exemption reason text
+          maxLength: 300
+          minLength: 0
+          type: string
+      required:
+      - category
+    VerificationResponse:
+      description: Full verification details of a seller.
+      example:
+        attestationVersion: attestationVersion
+        attestedAt: 2000-01-23T04:56:07.000+00:00
+        checks:
+        - cached: true
+          checkedAt: 2000-01-23T04:56:07.000+00:00
+          errorCode: errorCode
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          nameScore: 0
+          outcome: outcome
+          registeredName: registeredName
+          requestIdentifier: requestIdentifier
+          vatId: vatId
+        - cached: true
+          checkedAt: 2000-01-23T04:56:07.000+00:00
+          errorCode: errorCode
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          nameScore: 0
+          outcome: outcome
+          registeredName: registeredName
+          requestIdentifier: requestIdentifier
+          vatId: vatId
+        documents:
+        - fileName: fileName
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          mediaType: mediaType
+          sha256: sha256
+          size: 0
+          type: type
+          uploadedAt: 2000-01-23T04:56:07.000+00:00
+        - fileName: fileName
+          id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+          mediaType: mediaType
+          sha256: sha256
+          size: 0
+          type: type
+          uploadedAt: 2000-01-23T04:56:07.000+00:00
+        history:
+        - actor: actor
+          at: 2000-01-23T04:56:07.000+00:00
+          reason: reason
+          status: status
+        - actor: actor
+          at: 2000-01-23T04:56:07.000+00:00
+          reason: reason
+          status: status
+        verification: ""
+      properties:
+        attestationVersion:
+          description: "version of the confirmed text, if attested"
+          type: string
+        attestedAt:
+          description: "when the tenant confirmed, if attested"
+          format: date-time
+          type: string
+        checks:
+          description: "VAT ID checks, newest first"
+          items:
+            $ref: "#/components/schemas/VatCheckEntry"
+          type: array
+          default: null
+        documents:
+          description: "supporting documents, newest first"
+          items:
+            $ref: "#/components/schemas/DocumentEntry"
+          type: array
+          default: null
+        history:
+          description: "status changes, oldest first"
+          items:
+            $ref: "#/components/schemas/HistoryEntry"
+          type: array
+          default: null
+        verification:
+          allOf:
+          - $ref: "#/components/schemas/VerificationSummary"
+          description: current state
+    VerificationSummary:
+      description: Short verification state of a seller.
+      example:
+        attested: true
+        partnerCheck: partnerCheck
+        reason: reason
+        since: 2000-01-23T04:56:07.000+00:00
+        status: status
+      properties:
+        attested:
+          description: whether the tenant confirmed the seller's authorisation
+          type: boolean
+        partnerCheck:
+          description: |-
+            the access point partner's identity check: <code>unknown</code>, <code>pending</code>,
+                 <code>passed</code> or <code>failed</code>
+          type: string
+        reason:
+          description: "why (stable codes such as <code>vies.unavailable</code>, or\
+            \ the operator's text)"
+          type: string
+        since:
+          description: when the status was set
+          format: date-time
+          type: string
+        status:
+          description: "<code>unverified</code>, <code>pending_review</code>, <code>verified</code>\
+            \ or <code>rejected</code>"
+          type: string
+    WebhookDeliveryResponse:
+      description: One entry of a webhook endpoint's delivery log.
+      example:
+        attempts: 0
+        createdAt: 2000-01-23T04:56:07.000+00:00
+        eventId: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        eventType: eventType
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        lastError: lastError
+        lastStatusCode: 6
+        nextAttemptAt: 2000-01-23T04:56:07.000+00:00
+        status: status
+      properties:
+        attempts:
+          description: attempts so far
+          format: int32
+          type: integer
+        createdAt:
+          description: creation time
+          format: date-time
+          type: string
+        eventId:
+          description: event identifier
+          format: uuid
+          type: string
+        eventType:
+          description: event type
+          type: string
+        id:
+          description: identifier
+          format: uuid
+          type: string
+        lastError:
+          description: error of the last attempt
+          type: string
+        lastStatusCode:
+          description: HTTP status of the last attempt
+          format: int32
+          type: integer
+        nextAttemptAt:
+          description: next attempt (pending only)
+          format: date-time
+          type: string
+        status:
+          description: "<code>PENDING</code>, <code>DELIVERED</code> or <code>FAILED</code>"
+          type: string
+    WebhookRequest:
+      description: Request to register a webhook endpoint.
+      example:
+        events:
+        - invoice.issued
+        - invoice.issued
+        - invoice.issued
+        - invoice.issued
+        - invoice.issued
+        url: url
+      properties:
+        events:
+          description: |-
+            event types it receives: <code>invoice.issued</code>, <code>delivery.updated</code>,
+                 <code>document.received</code>, <code>seller.status_changed</code>, <code>invoice.received</code>; omitted or empty means
+                 all
+          items:
+            enum:
+            - invoice.issued
+            - delivery.updated
+            - document.received
+            - seller.status_changed
+            - invoice.received
+            minLength: 1
+            type: string
+          maxItems: 10
+          minItems: 0
+          type: array
+          default: null
+        url:
+          description: https URL
+          maxLength: 500
+          minLength: 0
+          type: string
+      required:
+      - url
+    WebhookResponse:
+      description: A webhook endpoint.
+      example:
+        createdAt: 2000-01-23T04:56:07.000+00:00
+        disabledAt: 2000-01-23T04:56:07.000+00:00
+        events:
+        - events
+        - events
+        id: 046b6c7f-0b8a-43b9-b35d-6489e6daee91
+        secret: secret
+        url: url
+      properties:
+        createdAt:
+          description: creation time
+          format: date-time
+          type: string
+        disabledAt:
+          description: removal time
+          format: date-time
+          type: string
+        events:
+          description: event types it receives; empty means all
+          items:
+            type: string
+          type: array
+          default: null
+        id:
+          description: identifier
+          format: uuid
+          type: string
+        secret:
+          description: signing secret; only in the response that created the endpoint
+            or rotated its secret
+          type: string
+        url:
+          description: target URL
+          type: string
+    WebhookUpdateRequest:
+      description: Request to change a webhook endpoint; omitted fields stay as they
+        are.
+      example:
+        events:
+        - invoice.issued
+        - invoice.issued
+        - invoice.issued
+        - invoice.issued
+        - invoice.issued
+        url: url
+      properties:
+        events:
+          description: new event types; an empty list means all
+          items:
+            enum:
+            - invoice.issued
+            - delivery.updated
+            - document.received
+            - seller.status_changed
+            - invoice.received
+            minLength: 1
+            type: string
+          maxItems: 10
+          minItems: 0
+          type: array
+          default: null
+        url:
+          description: new https URL
+          maxLength: 500
+          minLength: 0
+          type: string
+    Problem_accessPoint:
+      description: "Optional, only on Peppol refusals (codes peppol.*) and only for\
+        \ API keys with scope admin: what the Peppol access point answered. For diagnosis\
+        \ by a person; the text is not stable and may change at any time, so never\
+        \ parse it: use code."
+      properties:
+        message:
+          description: "The access point's own text in English, at most 300 characters;\
+            \ references to its support and its own e-mail addresses and URLs are\
+            \ removed as far as recognised; may be empty"
+          type: string
+        status:
+          description: HTTP status the Peppol access point answered with
+          format: int32
+          type: integer
+    Problem_errors_inner:
+      properties:
+        field:
+          description: Path of the invalid field
+          type: string
+        message:
+          description: What is wrong with it
+          type: string
+  securitySchemes:
+    apiKey:
+      in: header
+      name: X-API-Key
+      type: apiKey
+    bearer:
+      description: "API key fkn_… (older keys: eih_…)"
+      scheme: bearer
+      type: http
+
